@@ -1,0 +1,105 @@
+- hosts: k8s-master
+  vars_files:
+  - var.yml
+  tasks:
+        
+  - name: Install python3
+    package:
+         name: "python3"
+         state: present
+    changed_when: false
+
+  - name: "Installing docker on master node"
+    package: 
+     state: present
+     name: "docker"
+
+  - name: "starting docker service"
+    service:
+     name: "docker"
+     state: started
+     enabled: yes
+  
+  - name: "Configuring Kubernetes repo"
+    yum_repository: 
+     name: kubernetes
+     baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
+     description: kubernetes repo
+     enabled: 1
+     gpgcheck: 1
+     repo_gpgcheck: 1
+     gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+
+  - name: "Downloading kubeadm kubectl kubelet "
+    package:
+     state: present
+     name: ['kubeadm' , 'kubelet' , 'kubectl']
+    changed_when: false
+
+  - name: "starting kubelet service"
+    service:
+     name: "kubelet"
+     state: started
+     enabled: yes
+
+  - name: "Pulling docker images using kubeadm"
+    command: "kubeadm config images pull"
+    changed_when: false
+
+  - name: "Changing driver of docker from cgroup to systemd"
+    copy:
+     src: "daemon.json"
+     dest: "/etc/docker/daemon.json"
+
+  - name: "Restarting docker services"
+    service:
+     name: "docker"
+     state: restarted
+     enabled: yes
+
+  - name: "Installing iproute-tc on master node"
+    package:
+     state: present
+     name: "iproute-tc"
+
+  - name: "Enabling iptables Rule"
+    shell: "echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables"
+    changed_when: false
+
+  - name: "Intializing Master "
+    command: "kubeadm init --pod-network-cidr=10.240.0.0/16 --ignore-preflight-errors=NumCPU --ignore-preflight-errors=Mem"
+    ignore_errors: yes
+    changed_when: false
+
+  - name: "Setting Master as Clinet"
+    command: "mkdir -p $HOME/.kube"
+    changed_when: false
+ 
+  - name: "Setting Master as Client..."
+    command: "cp -i /etc/kubernetes/admin.conf $HOME/.kube/config"
+    changed_when: false
+    
+  - name: "Wait Your Master is Almost Ready"  
+    shell: "sudo chown $(id -u):$(id -g) $HOME/.kube/config" 
+    changed_when: false
+
+  - name: "Setting Up flannel"
+    command: "kubectl apply  -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml"
+    changed_when: false
+
+  - name: "Creating  Token For Client"
+    command: "kubeadm token create --print-join-command"
+    register: token 
+    changed_when: false
+
+  - debug:
+     var: token.stdout
+
+  - name: "Copying Token To Local System"
+    local_action: "copy content={{ token.stdout }} dest={{ tok }}"
+    changed_when: false
+ 
+
+ 
+ 

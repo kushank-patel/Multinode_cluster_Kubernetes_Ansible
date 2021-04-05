@@ -1,0 +1,28 @@
+- hosts: localhost
+  vars_files:
+  - awscredentials.yml        
+  tasks:
+  
+  - ec2:
+      
+      aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+      aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+      region: us-east-1
+      image: ami-038f1ca1bd58a5790
+      instance_type: t2.micro
+      wait: yes
+      count: 3
+      instance_tags: 
+        Name: kube
+      vpc_subnet_id: subnet-48d71869
+      group_id: sg-97c523b5
+      key_name: task19
+      state: present
+           
+  - name: execute install script
+    script: ec2.py
+       
+
+
+  
+
